@@ -127,7 +127,7 @@ flags.DEFINE_integer(
 class InputExample(object):
   """A single training/test example for simple sequence classification."""
 
-  def __init__(self, guid, text_a, text_b=None, label=None):
+  def __init__(self, guid, text_a, text_b=None, label=None, label_weight=None):
     """Constructs a InputExample.
 
     Args:
@@ -143,6 +143,7 @@ class InputExample(object):
     self.text_a = text_a
     self.text_b = text_b
     self.label = label
+    self.label_weight = label_weight
 
 
 class PaddingInputExample(object):
@@ -166,11 +167,13 @@ class InputFeatures(object):
                input_mask,
                segment_ids,
                label_id,
+               label_weight,
                is_real_example=True):
     self.input_ids = input_ids
     self.input_mask = input_mask
     self.segment_ids = segment_ids
     self.label_id = label_id
+    self.label_weight = label_weight
     self.is_real_example = is_real_example
 
 
@@ -384,6 +387,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
         input_mask=[0] * max_seq_length,
         segment_ids=[0] * max_seq_length,
         label_id=0,
+        label_weight=1.,
         is_real_example=False)
 
   label_map = {}
@@ -472,6 +476,7 @@ def convert_single_example(ex_index, example, label_list, max_seq_length,
       input_mask=input_mask,
       segment_ids=segment_ids,
       label_id=label_id,
+      label_weight=example.label_weight,
       is_real_example=True)
   return feature
 
@@ -717,12 +722,14 @@ def input_fn_builder(features, seq_length, is_training, drop_remainder):
   all_input_mask = []
   all_segment_ids = []
   all_label_ids = []
+  all_label_weights = []
 
   for feature in features:
     all_input_ids.append(feature.input_ids)
     all_input_mask.append(feature.input_mask)
     all_segment_ids.append(feature.segment_ids)
     all_label_ids.append(feature.label_id)
+    all_label_weights.append(feature.label_weight)
 
   def input_fn(params):
     """The actual input function."""
@@ -750,6 +757,8 @@ def input_fn_builder(features, seq_length, is_training, drop_remainder):
                 dtype=tf.int32),
         "label_ids":
             tf.constant(all_label_ids, shape=[num_examples], dtype=tf.int32),
+        "label_weights":
+            tf.constant(all_label_weights, shape=[num_examples], dtype=tf.float32),
     })
 
     if is_training:
